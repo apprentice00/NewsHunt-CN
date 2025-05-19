@@ -1,6 +1,11 @@
 import thulac
 import json
 import os
+import time
+
+# 添加补丁以修复 time.clock() 问题
+if not hasattr(time, 'clock'):
+    time.clock = time.perf_counter
 
 class Tokenizer:
     def __init__(self):
