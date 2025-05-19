@@ -1,7 +1,12 @@
+import sys
+import os
+# 将项目根目录添加到 Python 路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import math
 from collections import defaultdict
 import numpy as np
-from .tokenizer import Tokenizer
+from processor.tokenizer import Tokenizer
 
 class VSM:
     def __init__(self, indexer):
@@ -76,14 +81,18 @@ class VSM:
             similarity = self._calculate_cosine_similarity(query_vector, doc_vector)
             if similarity > 0:
                 # 获取文档信息
-                doc_info = next(info for info in self.indexer.inverted_index[term] 
-                              if info['doc_id'] == doc_id)
-                results.append({
-                    'title': doc_info['title'],
-                    'url': doc_info['url'],
-                    'date': doc_info['date'],
-                    'score': similarity
-                })
+                for term in query_vector:
+                    if term in self.indexer.inverted_index:
+                        for info in self.indexer.inverted_index[term]:
+                            if info['doc_id'] == doc_id:
+                                results.append({
+                                    'title': info['title'],
+                                    'url': info['url'],
+                                    'date': info['date'],
+                                    'score': similarity
+                                })
+                                break
+                        break
         
         # 按相似度降序排序
         results.sort(key=lambda x: x['score'], reverse=True)
@@ -92,7 +101,7 @@ class VSM:
 
 if __name__ == '__main__':
     # 测试检索
-    from indexer import Indexer
+    from processor.indexer import Indexer
     
     # 加载索引
     indexer = Indexer()
@@ -102,7 +111,7 @@ if __name__ == '__main__':
     vsm = VSM(indexer)
     
     # 测试查询
-    query = "国务院常务会议"
+    query = "人工智能"
     results = vsm.search(query)
     
     # 打印结果

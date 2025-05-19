@@ -1,0 +1,3 @@
+"""
+NewsHunt-CN processor package
+""" 

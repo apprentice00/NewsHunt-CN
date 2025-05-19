@@ -63,7 +63,7 @@ class XinhuanetSpider(scrapy.Spider):
             os.makedirs('data')
 
         # 爬虫关闭时，将数据保存为 JSON 文件
-        with open('data/news.json', 'w', encoding='utf-8') as f:
+        with open('../data/news.json', 'w', encoding='utf-8') as f:
             json.dump(self.items, f, ensure_ascii=False, indent=2)
 
         self.logger.info(f"Spider closed: {reason}. Total items scraped: {len(self.items)}")

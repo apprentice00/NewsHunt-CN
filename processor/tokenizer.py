@@ -70,8 +70,8 @@ if __name__ == '__main__':
     tokenizer = Tokenizer()
     
     # 设置输入输出文件路径
-    news_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'crawler', 'data', 'news.json')
-    output_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'crawler', 'data', 'news_tokenized.json')
+    news_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'news.json')
+    output_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'news_tokenized.json')
     
     # 处理新闻文件
     print(f"Processing news file: {news_file}")
