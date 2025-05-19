@@ -1,0 +1,10 @@
+scrapy==2.11.0
+thulac==0.2.1
+flask==3.0.2
+flask-cors==4.0.0
+numpy==1.26.4
+pandas==2.2.1
+jieba==0.42.1
+scikit-learn==1.4.0
+requests==2.31.0
+beautifulsoup4==4.12.3 
