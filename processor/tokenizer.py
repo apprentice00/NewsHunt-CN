@@ -66,7 +66,15 @@ class Tokenizer:
         return processed_news
 
 if __name__ == '__main__':
-    # 测试分词
+    # 初始化分词器
     tokenizer = Tokenizer()
-    test_text = "新华社北京3月15日电 国务院总理李强3月15日主持召开国务院常务会议"
-    print(tokenizer.tokenize(test_text)) 
+    
+    # 设置输入输出文件路径
+    news_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'crawler', 'data', 'news.json')
+    output_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'crawler', 'data', 'news_tokenized.json')
+    
+    # 处理新闻文件
+    print(f"Processing news file: {news_file}")
+    processed_news = tokenizer.process_news(news_file, output_file)
+    print(f"Processed {len(processed_news)} news articles")
+    print(f"Results saved to: {output_file}") 
