@@ -44,17 +44,19 @@ class VSM:
         
         return query_vector
     
-    def _calculate_bm25_score(self, query_vector, doc_id, doc_vector):
+    def _calculate_bm25_score(self, query_vector, doc_id, doc_vector, title_tokens=None):
         """
-        计算BM25分数
+        计算BM25分数，标题命中词提升权重
         :param query_vector: 查询向量
         :param doc_id: 文档ID
         :param doc_vector: 文档向量
+        :param title_tokens: 标题分词列表
         :return: BM25分数
         """
         score = 0.0
         doc_length = self.indexer.doc_lengths[doc_id]
-        
+        title_tokens = title_tokens or []
+        TITLE_BOOST = 1.5  # 标题权重提升系数
         for term, weight in query_vector.items():
             if term in doc_vector:
                 # 计算词频
@@ -64,9 +66,10 @@ class VSM:
                              (self.indexer.doc_freq[term] + 0.5) + 1)
                 # 计算文档长度归一化
                 length_norm = 1 - self.b + self.b * (doc_length / self.avg_doc_length)
+                # 标题命中提升权重
+                boost = TITLE_BOOST if term in title_tokens else 1.0
                 # 计算BM25分数
-                score += idf * (tf * (self.k1 + 1)) / (tf + self.k1 * length_norm)
-        
+                score += boost * idf * (tf * (self.k1 + 1)) / (tf + self.k1 * length_norm)
         return score
     
     def _calculate_time_decay(self, doc_date):
@@ -144,11 +147,9 @@ class VSM:
         # 计算综合分数并排序
         results = []
         for doc_id, doc_vector in doc_vectors.items():
-            # 计算BM25分数
-            bm25_score = self._calculate_bm25_score(query_vector, doc_id, doc_vector)
-            
-            # 获取文档信息
+            # 获取文档信息和标题分词
             doc_info = None
+            title_tokens = []
             for term in query_vector:
                 if term in self.indexer.inverted_index:
                     for info in self.indexer.inverted_index[term]:
@@ -157,26 +158,30 @@ class VSM:
                             break
                     if doc_info:
                         break
+            # 获取title_tokens
+            if doc_info and 'title' in doc_info:
+                title_tokens = self.tokenizer.tokenize(doc_info['title'])
+            # 计算BM25分数（传入title_tokens）
+            bm25_score = self._calculate_bm25_score(query_vector, doc_id, doc_vector, title_tokens)
             
-            if doc_info:
-                # 计算时间衰减分数
-                time_score = self._calculate_time_decay(doc_info['date'])
-                
-                # 计算多样性分数
-                diversity_score = self._calculate_diversity_score(results, doc_id, doc_vector)
-                
-                # 计算综合分数
-                final_score = (bm25_score * 0.5 +  # BM25分数权重
-                             time_score * 0.3 +    # 时间衰减权重
-                             diversity_score * 0.2)  # 多样性权重
-                
-                results.append({
-                    'doc_id': doc_id,
-                    'title': doc_info['title'],
-                    'url': doc_info['url'],
-                    'date': doc_info['date'],
-                    'score': final_score
-                })
+            # 计算时间衰减分数
+            time_score = self._calculate_time_decay(doc_info['date'])
+            
+            # 计算多样性分数
+            diversity_score = self._calculate_diversity_score(results, doc_id, doc_vector)
+            
+            # 计算综合分数
+            final_score = (bm25_score * 0.5 +  # BM25分数权重
+                         time_score * 0.3 +    # 时间衰减权重
+                         diversity_score * 0.2)  # 多样性权重
+            
+            results.append({
+                'doc_id': doc_id,
+                'title': doc_info['title'],
+                'url': doc_info['url'],
+                'date': doc_info['date'],
+                'score': final_score
+            })
         
         # 按综合分数降序排序
         results.sort(key=lambda x: x['score'], reverse=True)
