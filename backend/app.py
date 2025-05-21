@@ -113,5 +113,27 @@ def get_stats():
             'message': str(e)
         }), 500
 
+@app.route('/api/eval_stats', methods=['POST'])
+def eval_stats():
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({'error': '缺少查询参数'}), 400
+
+    try:
+        from evaluator.evaluation import Evaluator
+        evaluator = Evaluator(vsm)
+        if os.path.exists('data/judgments.json'):
+            evaluator.load_judgments('data/judgments.json')
+        precision = evaluator.calculate_precision_at_k(data['query'], k=10)
+        return jsonify({
+            'status': 'success',
+            'precision_at_10': precision
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 
