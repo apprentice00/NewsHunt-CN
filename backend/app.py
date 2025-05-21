@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from processor.indexer import Indexer
 from processor.vsm import VSM
+from processor.extractor import extract_info
 
 app = Flask(__name__)
 CORS(app)  # 启用跨域支持
@@ -110,6 +111,15 @@ def get_stats():
             'status': 'error',
             'message': str(e)
         }), 500
+
+@app.route('/api/extract_info', methods=['POST'])
+def extract_info_api():
+    data = request.get_json()
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'error': '缺少正文'}), 400
+    info = extract_info(text)
+    return jsonify({'status': 'success', 'info': info})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 

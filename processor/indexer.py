@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 import math
+import os
 
 class Indexer:
     def __init__(self):
@@ -8,6 +9,7 @@ class Indexer:
         self.doc_freq = defaultdict(int)  # 文档频率
         self.doc_count = 0  # 文档总数
         self.doc_lengths = {}  # 文档长度
+        self.news_data = None  # 新增，存储原始新闻数据
     
     def build_index(self, processed_news):
         """
@@ -86,6 +88,13 @@ class Indexer:
         self.doc_freq = defaultdict(int, index_data['doc_freq'])
         self.doc_count = index_data['doc_count']
         self.doc_lengths = index_data['doc_lengths']
+        # 新增：加载原始新闻数据
+        news_tokenized_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'news_tokenized.json')
+        if os.path.exists(news_tokenized_path):
+            with open(news_tokenized_path, 'r', encoding='utf-8') as f:
+                self.news_data = json.load(f)
+        else:
+            self.news_data = None
 
 if __name__ == '__main__':
     # 测试索引构建

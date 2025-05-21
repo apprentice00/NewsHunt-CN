@@ -37,6 +37,7 @@
             </template>
             <div class="result-content">
               <p>相关度：{{ (result.score * 100).toFixed(2) }}%</p>
+              <p v-if="result.content" style="max-height: 3em; overflow: hidden; color: #888; font-size: 13px;">{{ result.content.slice(0, 80) }}{{ result.content.length > 80 ? '...' : '' }}</p>
               <el-button type="primary" link @click="openUrl(result.url)">
                 查看原文
               </el-button>
@@ -45,6 +46,9 @@
               </el-button>
               <el-button type="danger" link @click="markIrrelevant(result)">
                 标记不相关
+              </el-button>
+              <el-button type="info" link @click="handleExtractInfo(result, index)">
+                信息抽取
               </el-button>
             </div>
           </el-card>
@@ -66,6 +70,18 @@
             <p>平均文档长度：{{ stats.avg_doc_length.toFixed(2) }}</p>
           </div>
         </el-card>
+
+        <!-- 信息抽取弹窗 -->
+        <el-dialog v-model="extractDialogVisible" title="信息抽取结果" width="500px" :before-close="() => {extractDialogVisible = false}">
+          <div v-if="extractInfo">
+            <div v-for="(val, key) in extractInfo" :key="key" style="margin-bottom: 10px;">
+              <strong>{{ key }}：</strong>
+              <span v-if="Array.isArray(val)">{{ val.join('，') || '无' }}</span>
+              <span v-else>{{ val || '无' }}</span>
+            </div>
+          </div>
+          <div v-else>正在抽取信息...</div>
+        </el-dialog>
       </el-main>
     </el-container>
   </div>
@@ -75,13 +91,14 @@
 import { ref, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElDialog } from 'element-plus'
 
 interface SearchResult {
   title: string
   date: string
   score: number
   url: string
+  content?: string
 }
 
 interface SystemStats {
@@ -94,6 +111,11 @@ const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const hasSearched = ref(false)
 const stats = ref<SystemStats | null>(null)
+
+// 信息抽取相关
+const extractDialogVisible = ref(false)
+const extractInfo = ref<any>(null)
+const extractingIndex = ref<number|null>(null)
 
 // 获取系统统计信息
 const fetchStats = async () => {
@@ -162,6 +184,26 @@ const markIrrelevant = async (result: any) => {
   } catch (error) {
     console.error('标记失败:', error)
     ElMessage.error('标记失败，请稍后重试')
+  }
+}
+
+// 信息抽取
+const handleExtractInfo = async (result: any, idx: number) => {
+  extractingIndex.value = idx
+  extractInfo.value = null
+  try {
+    // 传递正文内容
+    const response = await axios.post('http://localhost:5000/api/extract_info', {
+      text: result.content // 传递正文内容
+    })
+    if (response.data.status === 'success') {
+      extractInfo.value = response.data.info
+      extractDialogVisible.value = true
+    } else {
+      ElMessage.error('信息抽取失败')
+    }
+  } catch (error) {
+    ElMessage.error('信息抽取失败')
   }
 }
 

@@ -85,11 +85,17 @@ class VSM:
                     if term in self.indexer.inverted_index:
                         for info in self.indexer.inverted_index[term]:
                             if info['doc_id'] == doc_id:
+                                # 需要从原始数据获取content
+                                # 这里假设有self.indexer.news_data[doc_id]['content']
+                                content = None
+                                if hasattr(self.indexer, 'news_data') and self.indexer.news_data:
+                                    content = self.indexer.news_data[doc_id]['content']
                                 results.append({
                                     'title': info['title'],
                                     'url': info['url'],
                                     'date': info['date'],
-                                    'score': similarity
+                                    'score': similarity,
+                                    'content': content
                                 })
                                 break
                         break
