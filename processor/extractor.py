@@ -40,7 +40,7 @@ NON_PERSON_WORDS = {
     # 数量词
     '一个', '多个', '一些', '多名', '各种',
     # 其他
-    '时代', '更应', '解决方案', '角度', '帮助', '就业', '教材', '迅速', '典型',
+    '更应', '解决方案', '角度', '帮助', '就业', '教材', '迅速', '典型',
     '教学要求', '北邮', '过程', '虚拟', '以便', '心理健康', '知识结构', '相符',
     '高等教育', '思维能力', '教学质量', '方向', '营造', '隔阂', '核心', '心理',
     '情况', '阶段', '出发', '传统', '管理', '编辑', '跨专业', '全过程', '北京',
@@ -48,6 +48,24 @@ NON_PERSON_WORDS = {
     '自主', '论坛', '得力助手', '机会', '至关重要', '重要', '根据', '实时', '数字',
     '对此', '圆桌', '只能', '特点', '教学方法', '依然'
 }
+
+# 非人名后缀和排除词
+NON_PERSON_SUFFIX = ["时代", "论坛", "峰会", "活动", "AI", "发布会", "讲座"]
+# 非时间表达排除词
+NON_TIME_WORDS = ["AI时代", "人工智能时代"]
+
+# 事件动作优先词典（可扩展）
+EVENT_ACTION_DICT = set([
+    '制定政策', '深化改革', '完善机制', '健全体系', '协调关系', '建立平台',
+    '推动发展', '促进融合', '增强能力', '提升水平', '加强管理', '转型升级',
+    '创新发展', '开展对话', '举办会议', '表示支持', '主持工作', '成立机构',
+    '构建生态', '引入资源', '开放合作', '解决问题', '应对挑战', '精准施策',
+    '产教融合', '培养人才', '教育育人', '学习经验', '探索路径', '研究方案',
+    '传播理念', '识变求变', '激发活力', '承担责任', '规范操作', '分析形势',
+    '洞察趋势', '抓住机遇', '入手落实', '面对困难', '适应环境', '转变思路'
+])
+# 停用动词
+STOP_VERBS = set(['能', '要', '为', '是', '有', '在', '与', '和', '及', '将', '被', '让', '使', '于', '对', '以', '把', '到', '等', '并', '或', '及其', '及其'])
 
 def split_sentences(text):
     """
@@ -95,7 +113,6 @@ def is_person(word, context=None):
     return False
 
 def extract_info(text):
-    # 使用spacy处理文本
     doc = nlp(text)
     
     # 地点
@@ -103,20 +120,23 @@ def extract_info(text):
     # 人物
     persons = []
     
-    # 使用spacy的命名实体识别
     for ent in doc.ents:
-        if ent.label_ == 'GPE' or ent.label_ == 'LOC':  # GPE表示地理政治实体，LOC表示位置
+        # 地点
+        if ent.label_ == 'GPE' or ent.label_ == 'LOC':
             locations.append(ent.text)
+        # 人物，2-4字，排除非人名后缀和排除词
         elif ent.label_ == 'PERSON':
-            persons.append(ent.text)
+            if 2 <= len(ent.text) <= 4 and not any(ent.text.endswith(suf) for suf in NON_PERSON_SUFFIX):
+                persons.append(ent.text)
     
-    # 时间（使用spacy的时间识别和正则匹配）
+    # 时间
     times = []
-    # 1. 使用spacy识别时间
     for ent in doc.ents:
         if ent.label_ == 'DATE' or ent.label_ == 'TIME':
-            times.append(ent.text)
-    # 2. 使用正则匹配
+            # 排除非时间表达
+            if ent.text not in NON_TIME_WORDS and not ent.text.endswith("时代") and not ent.text.endswith("AI"):
+                times.append(ent.text)
+    # 正则补充标准时间表达式
     times.extend(re.findall(r'\d{4}年\d{1,2}月\d{1,2}日|\d{1,2}月\d{1,2}日|\d{4}-\d{1,2}-\d{1,2}', text))
 
     # 事件名称（使用关键词匹配）
@@ -125,16 +145,33 @@ def extract_info(text):
         if token.text.endswith(('大会', '活动', '论坛', '峰会', '展览', '仪式', '比赛', '讲座', '研讨会', '发布会')):
             event_names.append(token.text)
 
-    # 事件动作（使用spacy的词性标注）
-    actions = []
+    # 事件动作（动词短语抽取+词典优先+停用动词过滤）
+    actions = set()
+    # 1. 词典优先：只要原文中出现词典短语就收录
+    for phrase in EVENT_ACTION_DICT:
+        if phrase in text:
+            actions.add(phrase)
+    # 2. 依存句法分析：动词+名词短语
     for token in doc:
-        if token.pos_ == 'VERB':  # spacy中VERB表示动词
-            actions.append(token.text)
+        # 只考虑动词且非停用动词
+        if token.pos_ == 'VERB' and token.text not in STOP_VERBS:
+            # 动词+直接宾语
+            for child in token.children:
+                if child.dep_ in ('dobj', 'obj') and child.pos_ in ('NOUN', 'PROPN'):
+                    phrase = token.text + child.text
+                    actions.add(phrase)
+            # 动词+补语/定语
+            for child in token.children:
+                if child.dep_ in ('attr', 'acomp', 'ccomp', 'xcomp') and child.pos_ in ('NOUN', 'PROPN', 'ADJ'):
+                    phrase = token.text + child.text
+                    actions.add(phrase)
+    # 3. 过滤单字动词、停用动词、无实际意义的词
+    actions = {a for a in actions if len(a) > 2 and not any(stop in a for stop in STOP_VERBS)}
 
     return {
         '地点': list(set(locations)),
         '人物': list(set(persons)),
         '时间': list(set(times)),
         '事件名称': list(set(event_names)),
-        '事件动作': list(set(actions)),
+        '事件动作': list(actions),
     } 

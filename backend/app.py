@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sys
 import os
+import json
+import hashlib
+from datetime import datetime
 
 # 添加项目根目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -120,6 +123,61 @@ def extract_info_api():
         return jsonify({'error': '缺少正文'}), 400
     info = extract_info(text)
     return jsonify({'status': 'success', 'info': info})
+
+@app.route('/api/evaluate_extraction', methods=['POST'])
+def evaluate_extraction():
+    """
+    评价信息抽取结果
+    请求体格式：
+    {
+        "doc_url": "文档URL",
+        "accuracy": 80,  # 准确率评分（0-100）
+        "extracted_info": {
+            "地点": [...],
+            "人物": [...],
+            "时间": [...],
+            "事件名称": [...],
+            "事件动作": [...]
+        }
+    }
+    """
+    data = request.get_json()
+    
+    if not data or not all(k in data for k in ['doc_url', 'accuracy', 'extracted_info']):
+        return jsonify({'error': '缺少必要参数'}), 400
+    
+    try:
+        # 确保评价数据目录存在
+        os.makedirs('data/evaluations', exist_ok=True)
+        
+        # 构建评价数据
+        evaluation = {
+            'doc_url': data['doc_url'],
+            'accuracy': data['accuracy'],
+            'extracted_info': data['extracted_info'],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # 生成唯一的评价ID
+        evaluation_id = hashlib.md5(
+            f"{data['doc_url']}_{datetime.now().isoformat()}".encode()
+        ).hexdigest()
+        
+        # 保存评价结果
+        evaluation_file = f'data/evaluations/{evaluation_id}.json'
+        with open(evaluation_file, 'w', encoding='utf-8') as f:
+            json.dump(evaluation, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({
+            'status': 'success',
+            'message': '评价结果已保存',
+            'evaluation_id': evaluation_id
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 

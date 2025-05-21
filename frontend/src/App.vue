@@ -79,6 +79,22 @@
               <span v-if="Array.isArray(val)">{{ val.join('，') || '无' }}</span>
               <span v-else>{{ val || '无' }}</span>
             </div>
+            <div class="extract-evaluation" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+              <h4>抽取结果评价</h4>
+              <div v-if="extractEvaluation">
+                <p>准确率评分：{{ extractEvaluation.accuracy }}%</p>
+                <p>评价时间：{{ extractEvaluation.timestamp }}</p>
+              </div>
+              <div v-else>
+                <el-rate
+                  v-model="extractAccuracy"
+                  :max="5"
+                  :texts="['很差', '较差', '一般', '较好', '很好']"
+                  show-text
+                  @change="handleExtractEvaluation"
+                />
+              </div>
+            </div>
           </div>
           <div v-else>正在抽取信息...</div>
         </el-dialog>
@@ -116,6 +132,8 @@ const stats = ref<SystemStats | null>(null)
 const extractDialogVisible = ref(false)
 const extractInfo = ref<any>(null)
 const extractingIndex = ref<number|null>(null)
+const extractAccuracy = ref(0)
+const extractEvaluation = ref(null)
 
 // 获取系统统计信息
 const fetchStats = async () => {
@@ -204,6 +222,30 @@ const handleExtractInfo = async (result: any, idx: number) => {
     }
   } catch (error) {
     ElMessage.error('信息抽取失败')
+  }
+}
+
+// 处理抽取结果评价
+const handleExtractEvaluation = async (value: number) => {
+  if (!extractInfo.value || !searchResults.value[extractingIndex.value]) return
+  
+  try {
+    const response = await axios.post('http://localhost:5000/api/evaluate_extraction', {
+      doc_url: searchResults.value[extractingIndex.value].url,
+      accuracy: value * 20, // 转换为百分比
+      extracted_info: extractInfo.value
+    })
+    
+    if (response.data.status === 'success') {
+      extractEvaluation.value = {
+        accuracy: value * 20,
+        timestamp: new Date().toLocaleString()
+      }
+      ElMessage.success('评价已保存')
+    }
+  } catch (error) {
+    console.error('评价失败:', error)
+    ElMessage.error('评价失败，请稍后重试')
   }
 }
 
