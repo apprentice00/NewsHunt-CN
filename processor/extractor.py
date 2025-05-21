@@ -1,11 +1,8 @@
-import jieba
-import jieba.posseg as pseg
+import spacy
 import re
-from pyhanlp import *
-from ltp import LTP
 
-# 初始化LTP
-ltp = LTP()
+# 加载中文模型
+nlp = spacy.load("zh_core_web_sm")
 
 # 职务词列表
 POSITIONS = {
@@ -52,37 +49,12 @@ NON_PERSON_WORDS = {
     '对此', '圆桌', '只能', '特点', '教学方法', '依然'
 }
 
-def get_hanlp_ner(text):
+def split_sentences(text):
     """
-    使用HanLP进行命名实体识别
+    分句函数
     """
-    NerLexicon = JClass("com.hankcs.hanlp.dictionary.CoreDictionary")
-    ner_result = HanLP.segment(text)
-    persons = []
-    for term in ner_result:
-        if term.nature == 'nr':  # nr表示人名
-            persons.append(term.word)
-    return persons
-
-def get_ltp_ner(text):
-    """
-    使用LTP进行命名实体识别
-    """
-    seg, hidden = ltp.seg([text])
-    ner = ltp.ner(hidden)
-    persons = []
-    for i, (word, tag) in enumerate(zip(seg[0], ner[0])):
-        if tag == 'Nh':  # Nh表示人名
-            persons.append(word)
-    return persons
-
-def get_ltp_dependency(text):
-    """
-    使用LTP进行依存句法分析
-    """
-    seg, hidden = ltp.seg([text])
-    dep = ltp.dep(hidden)
-    return seg[0], dep[0]
+    doc = nlp(text)
+    return [sent.text.strip() for sent in doc.sents]
 
 def is_person(word, context=None):
     """
@@ -103,21 +75,14 @@ def is_person(word, context=None):
     if any(title in word for title in TITLES):
         return True
     
-    # 4. 使用HanLP的命名实体识别
-    if word in get_hanlp_ner(word):
-        return True
+    # 4. 使用spacy的命名实体识别
+    if context:
+        doc = nlp(context)
+        for ent in doc.ents:
+            if ent.text == word and ent.label_ == 'PERSON':
+                return True
     
-    # 5. 使用LTP的命名实体识别
-    if word in get_ltp_ner(word):
-        return True
-    
-    # 6. 使用jieba的词性标注
-    words = pseg.cut(word)
-    for w, flag in words:
-        if flag == 'nr':  # nr表示人名
-            return True
-    
-    # 7. 检查词长度（2-4个字）且不包含数字
+    # 5. 检查词长度（2-4个字）且不包含数字
     if 2 <= len(word) <= 4 and not any(c.isdigit() for c in word):
         # 排除一些常见的非人名词
         if not (word.endswith('公司') or word.endswith('大学') or 
@@ -125,68 +90,46 @@ def is_person(word, context=None):
                 word.endswith('部门') or word.endswith('单位') or
                 word.endswith('系统') or word.endswith('平台') or
                 word.endswith('项目') or word.endswith('工程')):
-            # 8. 如果有上下文，检查上下文中的职务词
-            if context:
-                context_words = jieba.cut(context)
-                for ctx_word in context_words:
-                    if any(pos in ctx_word for pos in POSITIONS):
-                        return True
             return True
     
     return False
 
 def extract_info(text):
-    # 分句
-    sentences = HanLP.extractSummary(text, 100)  # 使用HanLP进行分句
+    # 使用spacy处理文本
+    doc = nlp(text)
     
-    # 地点（使用HanLP的命名实体识别）
+    # 地点
     locations = []
-    for sentence in sentences:
-        ner_result = HanLP.segment(sentence)
-        for term in ner_result:
-            if term.nature == 'ns':  # ns表示地名
-                locations.append(term.word)
-    
-    # 人物（使用改进的规则）
+    # 人物
     persons = []
-    # 1. 使用HanLP的命名实体识别
-    persons.extend(get_hanlp_ner(text))
-    # 2. 使用LTP的命名实体识别
-    persons.extend(get_ltp_ner(text))
-    # 3. 使用自定义规则
-    words = list(jieba.cut(text))
-    for i, word in enumerate(words):
-        # 获取上下文（前后各5个词）
-        start = max(0, i - 5)
-        end = min(len(words), i + 6)
-        context = ' '.join(words[start:end])
-        
-        if is_person(word, context):
-            persons.append(word)
     
-    # 时间（使用HanLP的命名实体识别和正则匹配）
+    # 使用spacy的命名实体识别
+    for ent in doc.ents:
+        if ent.label_ == 'GPE' or ent.label_ == 'LOC':  # GPE表示地理政治实体，LOC表示位置
+            locations.append(ent.text)
+        elif ent.label_ == 'PERSON':
+            persons.append(ent.text)
+    
+    # 时间（使用spacy的时间识别和正则匹配）
     times = []
-    # 1. 使用HanLP识别时间
-    for sentence in sentences:
-        ner_result = HanLP.segment(sentence)
-        for term in ner_result:
-            if term.nature == 't':  # t表示时间
-                times.append(term.word)
+    # 1. 使用spacy识别时间
+    for ent in doc.ents:
+        if ent.label_ == 'DATE' or ent.label_ == 'TIME':
+            times.append(ent.text)
     # 2. 使用正则匹配
     times.extend(re.findall(r'\d{4}年\d{1,2}月\d{1,2}日|\d{1,2}月\d{1,2}日|\d{4}-\d{1,2}-\d{1,2}', text))
 
-    # 事件名称（使用依存句法分析）
+    # 事件名称（使用关键词匹配）
     event_names = []
-    seg, dep = get_ltp_dependency(text)
-    for i, (word, tag) in enumerate(zip(seg, dep)):
-        if word.endswith(('大会', '活动', '论坛', '峰会', '展览', '仪式', '比赛', '讲座', '研讨会', '发布会')):
-            event_names.append(word)
+    for token in doc:
+        if token.text.endswith(('大会', '活动', '论坛', '峰会', '展览', '仪式', '比赛', '讲座', '研讨会', '发布会')):
+            event_names.append(token.text)
 
-    # 事件动作（使用依存句法分析）
+    # 事件动作（使用spacy的词性标注）
     actions = []
-    for i, (word, tag) in enumerate(zip(seg, dep)):
-        if tag == 'HED':  # HED表示核心谓语
-            actions.append(word)
+    for token in doc:
+        if token.pos_ == 'VERB':  # spacy中VERB表示动词
+            actions.append(token.text)
 
     return {
         '地点': list(set(locations)),
