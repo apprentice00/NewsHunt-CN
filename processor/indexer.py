@@ -85,7 +85,7 @@ class Indexer:
         self.inverted_index = defaultdict(list, index_data['inverted_index'])
         self.doc_freq = defaultdict(int, index_data['doc_freq'])
         self.doc_count = index_data['doc_count']
-        self.doc_lengths = index_data['doc_lengths']
+        self.doc_lengths = {int(k): v for k, v in index_data['doc_lengths'].items()}
 
 if __name__ == '__main__':
     # 测试索引构建

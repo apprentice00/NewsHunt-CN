@@ -86,6 +86,8 @@ def evaluate():
             'message': '评估结果已保存'
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # 打印详细堆栈到控制台，便于调试
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -104,6 +106,28 @@ def get_stats():
                 'term_count': len(indexer.inverted_index),
                 'avg_doc_length': sum(indexer.doc_lengths.values()) / len(indexer.doc_lengths)
             }
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/eval_stats', methods=['POST'])
+def eval_stats():
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({'error': '缺少查询参数'}), 400
+
+    try:
+        from evaluator.evaluation import Evaluator
+        evaluator = Evaluator(vsm)
+        if os.path.exists('data/judgments.json'):
+            evaluator.load_judgments('data/judgments.json')
+        precision = evaluator.calculate_precision_at_k(data['query'], k=10)
+        return jsonify({
+            'status': 'success',
+            'precision_at_10': precision
         })
     except Exception as e:
         return jsonify({

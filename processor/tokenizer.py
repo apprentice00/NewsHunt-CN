@@ -1,4 +1,4 @@
-import thulac
+import jieba
 import json
 import os
 import time
@@ -9,12 +9,18 @@ if not hasattr(time, 'clock'):
 
 class Tokenizer:
     def __init__(self):
-        # 初始化 THULAC 分词器
-        self.thu = thulac.thulac(seg_only=True)
+        # 加载自定义词典
+        self._load_custom_dict()
         
         # 加载停用词
         self.stopwords = set()
         self._load_stopwords()
+    
+    def _load_custom_dict(self):
+        """加载自定义词典"""
+        dict_path = os.path.join(os.path.dirname(__file__), 'custom_dict.txt')
+        if os.path.exists(dict_path):
+            jieba.load_userdict(dict_path)
     
     def _load_stopwords(self):
         """加载停用词表"""
@@ -29,8 +35,8 @@ class Tokenizer:
         :param text: 输入文本
         :return: 分词后的词列表
         """
-        # 使用 THULAC 进行分词
-        words = self.thu.cut(text, text=True).split()
+        # 使用jieba进行分词
+        words = jieba.lcut(text)
         
         # 去除停用词
         words = [word for word in words if word not in self.stopwords]
@@ -69,12 +75,19 @@ if __name__ == '__main__':
     # 初始化分词器
     tokenizer = Tokenizer()
     
+    # 测试分词效果
+    test_text = "北京邮电大学是一所著名的大学，位于北京市海淀区。"
+    tokens = tokenizer.tokenize(test_text)
+    print("\n测试分词效果:")
+    print(f"原文: {test_text}")
+    print(f"分词结果: {tokens}")
+    
     # 设置输入输出文件路径
     news_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'news.json')
     output_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'news_tokenized.json')
     
     # 处理新闻文件
-    print(f"Processing news file: {news_file}")
+    print(f"\nProcessing news file: {news_file}")
     processed_news = tokenizer.process_news(news_file, output_file)
     print(f"Processed {len(processed_news)} news articles")
     print(f"Results saved to: {output_file}") 

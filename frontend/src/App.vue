@@ -66,6 +66,18 @@
             <p>平均文档长度：{{ stats.avg_doc_length.toFixed(2) }}</p>
           </div>
         </el-card>
+
+        <!-- 评估指标 -->
+        <div v-if="evalStats && typeof evalStats.precision_at_10 === 'number'" class="eval-stats">
+          <el-alert
+            title="当前查询的评估指标"
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 20px;"
+            :description="`P@10（前10条准确率）：${(evalStats.precision_at_10 * 100).toFixed(2)}%`"
+          />
+        </div>
       </el-main>
     </el-container>
   </div>
@@ -94,6 +106,7 @@ const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const hasSearched = ref(false)
 const stats = ref<SystemStats | null>(null)
+const evalStats = ref<{ precision_at_10: number } | null>(null)
 
 // 获取系统统计信息
 const fetchStats = async () => {
@@ -104,6 +117,21 @@ const fetchStats = async () => {
     }
   } catch (error) {
     console.error('获取统计信息失败:', error)
+  }
+}
+
+// 获取评估指标
+const fetchEvalStats = async () => {
+  if (!searchQuery.value.trim()) return
+  try {
+    const response = await axios.post('http://localhost:5000/api/eval_stats', {
+      query: searchQuery.value
+    })
+    if (response.data.status === 'success') {
+      evalStats.value = { precision_at_10: response.data.precision_at_10 }
+    }
+  } catch (error) {
+    console.error('获取评估指标失败:', error)
   }
 }
 
@@ -128,6 +156,8 @@ const handleSearch = async () => {
     console.error('搜索失败:', error)
     ElMessage.error('搜索失败，请稍后重试')
   }
+
+  await fetchEvalStats()
 }
 
 // 打开原文链接
@@ -148,6 +178,8 @@ const markRelevant = async (result: any) => {
     console.error('标记失败:', error)
     ElMessage.error('标记失败，请稍后重试')
   }
+
+  await fetchEvalStats()
 }
 
 // 标记不相关
@@ -163,6 +195,8 @@ const markIrrelevant = async (result: any) => {
     console.error('标记失败:', error)
     ElMessage.error('标记失败，请稍后重试')
   }
+
+  await fetchEvalStats()
 }
 
 // 组件挂载时获取统计信息
@@ -242,5 +276,10 @@ onMounted(() => {
   margin: 0;
   font-size: 16px;
   color: #606266;
+}
+
+.eval-stats {
+  max-width: 800px;
+  margin: 20px auto 0 auto;
 }
 </style>
