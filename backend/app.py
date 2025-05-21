@@ -86,6 +86,8 @@ def evaluate():
             'message': '评估结果已保存'
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # 打印详细堆栈到控制台，便于调试
         return jsonify({
             'status': 'error',
             'message': str(e)
