@@ -1,6 +1,11 @@
-*# 忽略 Python 编译文件和缓存目录*
+# 忽略所有 .pyc 文件
+*.pyc
 
-__pycache__/
+# 忽略特定的 .tar.gz 文件
+zh_core_web_sm-3.8.0.tar.gz
 
-*.pyc 
+# 忽略 data/evaluations 目录下的所有文件
+data/evaluations/*
 
+# 忽略 processor/_pycache_ 目录及其内容
+processor/_pycache_/
