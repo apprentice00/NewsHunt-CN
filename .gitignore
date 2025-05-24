@@ -1,3 +1,5 @@
 # 忽略 Python 编译文件和缓存目录
 __pycache__/
 *.pyc 
+*.gz
+data/evaluations/
